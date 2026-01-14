@@ -7,6 +7,8 @@ Requirements:
 
 Beispiel Nutzung:
   python validate_practice_websites.py --input input.xlsx --output output_validated.xlsx
+  python validate_practice_websites.py --input /path/to/input.xlsx --output /path/to/output/output_validated.xlsx
+  python validate_practice_websites.py --input "C:\Users\Name\Documents\input.xlsx" --output "C:\Users\Name\Documents\output_validated.xlsx"
 """
 
 import argparse
