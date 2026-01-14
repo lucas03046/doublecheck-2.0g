@@ -1,14 +1,7 @@
 #!/usr/bin/env python3
 """
-Validierung von Arztpraxen-Websites basierend auf einer Excel-Datei
-
-Requirements:
-  pip install openpyxl pandas requests beautifulsoup4 rapidfuzz
-
-Beispiel Nutzung:
-  python validate_practice_websites.py --input input.xlsx --output output_validated.xlsx
-  python validate_practice_websites.py --input /path/to/input.xlsx --output /path/to/output/output_validated.xlsx
-  python validate_practice_websites.py --input "C:\Users\Name\Documents\input.xlsx" --output "C:\Users\Name\Documents\output_validated.xlsx"
+Validierung von Arztpraxen-Websites
+Treshold hoch angesetzt, die "validen" sind mit sehr hoher wahrscheinlichkeit auch tatsächtlich valide (true positive) 
 """
 
 import argparse
@@ -17,6 +10,7 @@ import logging
 import re
 import time
 import unicodedata
+from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 from urllib.parse import urlparse
 
@@ -24,6 +18,11 @@ import pandas as pd
 import requests
 from bs4 import BeautifulSoup
 from rapidfuzz import fuzz
+
+
+# Basis-Verzeichnis und Input-Datei
+BASE_DIR = Path(r"C:\Users\LucasSvoboda\Documents\URL Check")
+INPUT_FILE = BASE_DIR / "Unklare_URL_Check_Abgleich_Name_und_Website_14012026.xlsx"
 
 
 # Configure logging
@@ -321,7 +320,7 @@ def process_file(
     output_file: str,
     output_csv: str,
     errors_csv: str,
-    sheet_name: str = 'Sheet1',
+    sheet_name: str = 'Tabelle1',
     threshold: float = 95.0,
     rate: float = 1.0,
     timeout: int = 15
@@ -417,27 +416,62 @@ def process_file(
         raise
 
 
+def generate_output_filenames(output_base: str = None) -> Tuple[str, str, str, str]:
+    """Generiere Output-Dateinamen mit Timestamp"""
+    timestamp = time.strftime("%Y%m%d_%H%M%S")
+    
+    if output_base:
+        # Verwende den Basisnamen des Outputs für den Timestamp
+        output_path = Path(output_base)
+        base_name = output_path.stem  # Name ohne Erweiterung
+        dir_name = output_path.parent if output_path.parent != Path('.') else BASE_DIR
+        
+        output_file = dir_name / f"{base_name}_{timestamp}.xlsx"
+        output_csv = dir_name / f"{base_name}_{timestamp}.csv"
+        errors_csv = dir_name / f"errors_{timestamp}.csv"
+        log_file = dir_name / f"validation_{timestamp}.log"
+    else:
+        # Fallback zu Standard-Namen
+        output_file = BASE_DIR / f"output_validated_{timestamp}.xlsx"
+        output_csv = BASE_DIR / f"output_validated_{timestamp}.csv"
+        errors_csv = BASE_DIR / f"errors_{timestamp}.csv"
+        log_file = BASE_DIR / f"validation_{timestamp}.log"
+    
+    return str(output_file), str(output_csv), str(errors_csv), str(log_file)
+
+
 def main():
     """Main-Funktion mit CLI Argumenten"""
     parser = argparse.ArgumentParser(description='Validierung von Arztpraxen-Websites')
     
-    parser.add_argument('--input', default='input.xlsx', help='Input Excel-Datei')
-    parser.add_argument('--output', default='output_validated.xlsx', help='Output Excel-Datei')
-    parser.add_argument('--sheet', default='Sheet1', help='Sheet-Name in Excel-Datei')
+    parser.add_argument('--input', default=str(INPUT_FILE), help='Input Excel-Datei')
+    parser.add_argument('--output', default='output_validated.xlsx', help='Output Excel-Datei (wird mit Timestamp versehen)')
+    parser.add_argument('--sheet', default='Tabelle1', help='Sheet-Name in Excel-Datei')
     parser.add_argument('--threshold', type=float, default=95.0, help='Matching-Schwellwert (0-100)')
     parser.add_argument('--rate', type=float, default=1.0, help='Rate Limit (requests pro Sekunde)')
     parser.add_argument('--timeout', type=int, default=15, help='Timeout in Sekunden')
     
     args = parser.parse_args()
     
-    # Setze Output-Dateien
-    output_csv = args.output.replace('.xlsx', '.csv')
-    errors_csv = 'errors.csv'
+    # Generiere Output-Dateinamen mit Timestamp
+    output_file, output_csv, errors_csv, log_file = generate_output_filenames(args.output)
+    
+    # Konfiguriere Logging für die spezifische Log-Datei
+    for handler in logging.root.handlers[:]:
+        logging.root.removeHandler(handler)
+    
+    logging.basicConfig(
+        filename=log_file,
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s'
+    )
+    
+    logger.info(f"Starting validation with output files: {output_file}, {output_csv}, {errors_csv}, {log_file}")
     
     # Starte Verarbeitung
     process_file(
         input_file=args.input,
-        output_file=args.output,
+        output_file=output_file,
         output_csv=output_csv,
         errors_csv=errors_csv,
         sheet_name=args.sheet,
